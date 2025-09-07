@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Executive-style CSS with font sizes reduced by 1.5 points
+# Executive-style CSS with 3-column horizontal layout
 st.markdown("""
 <style>
     .main-header {
@@ -29,22 +29,30 @@ st.markdown("""
         font-family: 'Helvetica Neue', sans-serif;
         letter-spacing: -0.5px;
     }
-    .insight-container {
+    .executive-summary-container {
+        margin-bottom: 40px;
+    }
+    .insights-row {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 40px;
-        gap: 15px;
+        margin-bottom: 20px;
+        gap: 20px;
     }
     .insight-box {
         background: linear-gradient(135deg, #003366 0%, #004080 100%);
         color: white;
-        padding: 30px 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 32px rgba(0,51,102,0.2);
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 6px 24px rgba(0,51,102,0.2);
         flex: 1;
         text-align: center;
         border: 1px solid rgba(255,255,255,0.1);
         transition: transform 0.3s ease;
+        min-height: 130px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        max-width: 320px;
     }
     .insight-box:hover {
         transform: translateY(-5px);
@@ -56,23 +64,24 @@ st.markdown("""
         background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     }
     .insight-title {
-        font-size: 12.5px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 600;
         margin-bottom: 8px;
         opacity: 0.95;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.8px;
     }
     .insight-value {
-        font-size: 26.5px;
+        font-size: 24px;
         font-weight: 700;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         line-height: 1;
     }
     .insight-subtitle {
-        font-size: 9.5px;
+        font-size: 8.5px;
         opacity: 0.85;
         font-style: italic;
+        letter-spacing: 0.3px;
     }
     .filter-section {
         background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -116,62 +125,70 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# OneDrive file configuration
-def convert_onedrive_url(share_url):
+# Enhanced OneDrive file configuration
+def get_onedrive_direct_link(share_url):
     """Convert OneDrive sharing URL to direct download URL"""
     try:
-        # For OneDrive URLs, attempt to convert to direct download
-        if "onedrive.live.com" in share_url:
-            # Extract file ID and convert to direct download
-            if "resid=" in share_url:
-                # Try to construct direct download URL
-                base_url = share_url.split("?")[0]
-                direct_url = base_url + "?download=1"
-                return direct_url
+        if "onedrive.live.com" in share_url and "download=1" not in share_url:
+            # Add download parameter
+            separator = "&" if "?" in share_url else "?"
+            return f"{share_url}{separator}download=1"
         elif "1drv.ms" in share_url:
-            # Handle shortened OneDrive URLs
-            return share_url + "&download=1" if "?" in share_url else share_url + "?download=1"
-        
+            # Handle shortened URLs
+            separator = "&" if "?" in share_url else "?"
+            return f"{share_url}{separator}download=1"
         return share_url
     except:
         return share_url
 
-# Load data from OneDrive
+# Enhanced OneDrive data loading
 @st.cache_data
 def load_data_from_onedrive(onedrive_url):
+    """Load Excel data from OneDrive with multiple fallback methods"""
     try:
-        # Convert sharing URL to direct download
-        direct_url = convert_onedrive_url(onedrive_url)
+        # Method 1: Direct OneDrive download
+        direct_url = get_onedrive_direct_link(onedrive_url)
         
-        # Try loading directly first
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        
+        # Try direct download with proper headers
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
             response = requests.get(direct_url, headers=headers, timeout=30, allow_redirects=True)
-            
-            if response.status_code == 200:
-                df = pd.read_excel(BytesIO(response.content), sheet_name="Savings_WIP_Data")
-                return df, "OneDrive file loaded successfully"
-        except Exception as e:
-            # Try alternative approach
-            try:
-                response = requests.get(onedrive_url, headers=headers, timeout=30)
-                if response.status_code == 200:
+            if response.status_code == 200 and len(response.content) > 1000:  # Ensure we got actual file content
+                try:
                     df = pd.read_excel(BytesIO(response.content), sheet_name="Savings_WIP_Data")
-                    return df, "OneDrive file loaded successfully (alternative method)"
-            except:
-                pass
+                    if len(df) > 0:  # Ensure we have data
+                        return df, "✅ OneDrive file loaded successfully"
+                except Exception as excel_error:
+                    st.warning(f"Excel parsing error: {str(excel_error)}")
+        except Exception as request_error:
+            st.warning(f"OneDrive request error: {str(request_error)}")
         
-        # Fallback to local file for demonstration
+        # Method 2: Try original URL without modification
+        try:
+            response = requests.get(onedrive_url, headers=headers, timeout=30, allow_redirects=True)
+            if response.status_code == 200 and len(response.content) > 1000:
+                df = pd.read_excel(BytesIO(response.content), sheet_name="Savings_WIP_Data")
+                if len(df) > 0:
+                    return df, "✅ OneDrive file loaded (alternative method)"
+        except:
+            pass
+        
+        # Method 3: Fallback to local file
         try:
             df = pd.read_excel("SCP_Savings_FY26_dummy_v3.xlsx", sheet_name="Savings_WIP_Data")
-            return df, "Using local file (OneDrive connection issue - please check URL)"
-        except:
-            return None, "Unable to load data from OneDrive or local file"
+            return df, "⚠️ Using local file (OneDrive access failed - check URL and permissions)"
+        except FileNotFoundError:
+            return None, "❌ OneDrive connection failed and no local file found"
+        except Exception as e:
+            return None, f"❌ Error loading local file: {str(e)}"
             
     except Exception as e:
-        return None, f"Error loading data: {str(e)}"
+        return None, f"❌ Critical error: {str(e)}"
 
 # Dashboard Header
 st.markdown('<h1 class="main-header">Executive SCP Savings Dashboard</h1>', unsafe_allow_html=True)
@@ -181,7 +198,7 @@ with st.sidebar:
     st.markdown('<div class="onedrive-config">', unsafe_allow_html=True)
     st.header("🔗 OneDrive Configuration")
     
-    # *** THIS IS THE LINE TO UPDATE YOUR ONEDRIVE URL ***
+    # Updated OneDrive URL configuration
     default_url = "https://onedrive.live.com/:x:/g/personal/9E1C07238F947303/EbI62L-aBvdDgxmyFIMOdugB5BoH7r7ATZcU1ywNSR1Psw?resid=9E1C07238F947303!sbfd83ab2069a43f78319b214830e76e8&ithint=file%2Cxlsx&e=bSpS5T&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy85ZTFjMDcyMzhmOTQ3MzAzL0ViSTYyTC1hQnZkRGd4bXlGSU1PZHVnQjVCb0g3cjdBVFpjVTF5d05TUjFQc3c_ZT1iU3BTNVQ"
     
     onedrive_url = st.text_input(
@@ -190,9 +207,15 @@ with st.sidebar:
         help="Paste your OneDrive Excel file sharing URL here"
     )
     
-    if st.button("🔄 Reload Data"):
-        st.cache_data.clear()
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Reload Data"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col2:
+        if st.button("🔗 Test URL"):
+            st.info("Testing OneDrive connection...")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -200,17 +223,26 @@ with st.sidebar:
     st.info("📊 Data Source: OneDrive Integration")
     st.markdown("---")
     st.markdown("**Dashboard Features:**")
-    st.markdown("• Executive Summary")
+    st.markdown("• Executive Summary (3-Column Layout)")
     st.markdown("• Strategic Analytics")
     st.markdown("• Domain Analysis")
     st.markdown("• Portfolio Overview")
+    st.markdown("• OneDrive Auto-Sync")
 
 # Load data from OneDrive
-df, load_message = load_data_from_onedrive(onedrive_url)
+with st.spinner("Loading data from OneDrive..."):
+    df, load_message = load_data_from_onedrive(onedrive_url)
+
+# Display load status
+if df is not None:
+    if "successfully" in load_message:
+        st.success(load_message)
+    else:
+        st.warning(load_message)
+else:
+    st.error(load_message)
 
 if df is not None:
-    st.success(f"✅ {load_message}")
-    
     # Data preprocessing
     df.rename(columns={
         "Difference (PA)-Finance": "Savings_Finance",
@@ -334,12 +366,15 @@ if df is not None:
     gains_scp = filtered_df.loc[filtered_df["Savings_SCP"] > 0, "Savings_SCP"].sum()
     risks_scp = filtered_df.loc[filtered_df["Savings_SCP"] < 0, "Savings_SCP"].sum()
 
-    # EXECUTIVE SUMMARY PANEL
+    # EXECUTIVE SUMMARY PANEL - 3 COLUMN HORIZONTAL LAYOUT
+    st.markdown('<div class="executive-summary-container">', unsafe_allow_html=True)
     st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
     
-    insights_col1, insights_col2, insights_col3, insights_col4, insights_col5, insights_col6 = st.columns(6)
+    # First Row - Finance Metrics
+    st.markdown('<div class="insights-row">', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
     
-    with insights_col1:
+    with col1:
         st.markdown(f"""
         <div class="insight-box">
             <div class="insight-title">Net Finance Impact</div>
@@ -348,7 +383,7 @@ if df is not None:
         </div>
         """, unsafe_allow_html=True)
 
-    with insights_col2:
+    with col2:
         st.markdown(f"""
         <div class="insight-box insight-gains">
             <div class="insight-title">Finance Upside</div>
@@ -357,7 +392,7 @@ if df is not None:
         </div>
         """, unsafe_allow_html=True)
 
-    with insights_col3:
+    with col3:
         st.markdown(f"""
         <div class="insight-box insight-risks">
             <div class="insight-title">Finance Exposure</div>
@@ -365,8 +400,14 @@ if df is not None:
             <div class="insight-subtitle">Risk Management</div>
         </div>
         """, unsafe_allow_html=True)
-
-    with insights_col4:
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Second Row - SCP Metrics
+    st.markdown('<div class="insights-row">', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
         st.markdown(f"""
         <div class="insight-box">
             <div class="insight-title">Net SCP Impact</div>
@@ -375,7 +416,7 @@ if df is not None:
         </div>
         """, unsafe_allow_html=True)
 
-    with insights_col5:
+    with col2:
         st.markdown(f"""
         <div class="insight-box insight-gains">
             <div class="insight-title">SCP Upside</div>
@@ -384,7 +425,7 @@ if df is not None:
         </div>
         """, unsafe_allow_html=True)
 
-    with insights_col6:
+    with col3:
         st.markdown(f"""
         <div class="insight-box insight-risks">
             <div class="insight-title">SCP Exposure</div>
@@ -392,8 +433,9 @@ if df is not None:
             <div class="insight-subtitle">Risk Management</div>
         </div>
         """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # STRATEGIC ANALYTICS SECTION
     st.markdown('<h2 class="section-header">📊 Strategic Analytics</h2>', unsafe_allow_html=True)
@@ -604,20 +646,35 @@ if df is not None:
         )
 
 else:
-    # Error state
-    st.error(f"⚠️ {load_message}")
-    st.info("Please check your OneDrive URL and ensure the file is accessible.")
+    # Enhanced error state with troubleshooting
+    st.error("❌ Unable to load data from OneDrive")
     
-    # Show example URL format
-    st.markdown("### 📝 OneDrive URL Format")
-    st.code("https://onedrive.live.com/:x:/g/personal/[user-id]/[file-params]")
+    with st.expander("🔧 OneDrive Troubleshooting Guide"):
+        st.markdown("""
+        **Common Issues & Solutions:**
+        
+        1. **File Permissions**
+           - Ensure the OneDrive file is shared with "Anyone with the link can view"
+           - Check that the link hasn't expired
+        
+        2. **URL Format**
+           - Use the sharing link from OneDrive (not the browser URL)
+           - Link should start with `https://onedrive.live.com/`
+        
+        3. **File Location**
+           - Verify the Excel file contains a sheet named "Savings_WIP_Data"
+           - Ensure the file is not password protected
+        
+        4. **Network Issues**
+           - Check your internet connection
+           - Try refreshing the page
+           - Corporate firewalls might block OneDrive access
+        
+        **Next Steps:**
+        1. Click "Test URL" button in sidebar to verify connection
+        2. Try pasting a new OneDrive sharing link
+        3. Contact IT support if issues persist
+        """)
     
-    st.markdown("### 🔧 Troubleshooting")
-    st.markdown("• Ensure the OneDrive file has appropriate sharing permissions")
-    st.markdown("• Verify the Excel file contains 'Savings_WIP_Data' sheet")
-    st.markdown("• Check if the file URL is accessible from external applications")
-    st.markdown("• Contact IT support if OneDrive API integration is required")
-
-# Footer
-st.markdown("---")
-st.markdown("**Executive SCP Savings Dashboard** | OneDrive Integration | Strategic Portfolio Analytics | Confidential")
+    # Show current URL being attempted
+    if 'onedrive_url' in locals():
