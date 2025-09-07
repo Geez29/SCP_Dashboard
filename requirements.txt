@@ -1,6 +1,6 @@
-streamlit>=1.28.0
+streamlit
 pandas
+openpyxl
 plotly
 numpy
-# Add dash only if you actually need it
-dash
+# Add other packages you need
