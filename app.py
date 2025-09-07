@@ -1,4 +1,4 @@
-# app.py - Enhanced SCP Savings Dashboard with McKinsey-style visuals
+# app.py - Executive SCP Savings Dashboard
 
 import streamlit as st
 import pandas as pd
@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# McKinsey-style CSS
+# Executive-style CSS
 st.markdown("""
 <style>
     .main-header {
@@ -23,61 +23,86 @@ st.markdown("""
         color: #003366;
         text-align: center;
         font-weight: 700;
-        margin-bottom: 30px;
+        margin-bottom: 40px;
         font-family: 'Helvetica Neue', sans-serif;
+        letter-spacing: -0.5px;
     }
     .insight-container {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 30px;
-        gap: 20px;
+        margin-bottom: 40px;
+        gap: 15px;
     }
     .insight-box {
         background: linear-gradient(135deg, #003366 0%, #004080 100%);
         color: white;
-        padding: 25px;
-        border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0,51,102,0.15);
+        padding: 30px 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0,51,102,0.2);
         flex: 1;
         text-align: center;
-        border-left: 5px solid #00ccff;
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: transform 0.3s ease;
     }
-    .insight-positive {
-        background: linear-gradient(135deg, #006633 0%, #00804d 100%);
-        border-left: 5px solid #00ff80;
+    .insight-box:hover {
+        transform: translateY(-5px);
     }
-    .insight-negative {
-        background: linear-gradient(135deg, #cc0000 0%, #e60000 100%);
-        border-left: 5px solid #ff6666;
+    .insight-gains {
+        background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);
+    }
+    .insight-risks {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     }
     .insight-title {
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 500;
-        margin-bottom: 10px;
-        opacity: 0.9;
+        margin-bottom: 8px;
+        opacity: 0.95;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .insight-value {
-        font-size: 32px;
+        font-size: 28px;
         font-weight: 700;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
+        line-height: 1;
     }
     .insight-subtitle {
-        font-size: 12px;
-        opacity: 0.8;
+        font-size: 11px;
+        opacity: 0.85;
+        font-style: italic;
     }
-    .filter-container {
-        background-color: #f8fafc;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #003366;
-        margin-bottom: 20px;
+    .filter-section {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        padding: 25px;
+        border-radius: 15px;
+        border: 1px solid #cbd5e0;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.05);
     }
     .chart-container {
         background-color: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+    }
+    .section-header {
+        font-size: 24px;
+        color: #003366;
+        font-weight: 600;
         margin-bottom: 20px;
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+    .data-summary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+        font-weight: 500;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -130,11 +155,11 @@ if df is not None:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
     # Dashboard Header
-    st.markdown('<h1 class="main-header">SCP Savings Dashboard</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">Executive SCP Savings Dashboard</h1>', unsafe_allow_html=True)
 
     # FILTERS SECTION
-    st.markdown('<div class="filter-container">', unsafe_allow_html=True)
-    st.subheader("🔍 Dashboard Filters")
+    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
+    st.markdown('<h3 class="section-header">📊 Business Intelligence Filters</h3>', unsafe_allow_html=True)
     
     filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
     
@@ -145,7 +170,7 @@ if df is not None:
             max_start_date = df["Contract Start"].max()
             if pd.notna(min_start_date) and pd.notna(max_start_date):
                 start_date_filter = st.date_input(
-                    "Contract Start Date (From)",
+                    "Contract Start Date",
                     value=min_start_date.date(),
                     min_value=min_start_date.date(),
                     max_value=max_start_date.date()
@@ -162,7 +187,7 @@ if df is not None:
             max_end_date = df["Contract End"].max()
             if pd.notna(min_end_date) and pd.notna(max_end_date):
                 end_date_filter = st.date_input(
-                    "Contract End Date (To)",
+                    "Contract End Date",
                     value=max_end_date.date(),
                     min_value=min_end_date.date(),
                     max_value=max_end_date.date()
@@ -177,7 +202,7 @@ if df is not None:
         if "FY of Savings-Finance" in df.columns:
             finance_fy_options = ["All"] + sorted(df["FY of Savings-Finance"].dropna().unique().tolist())
             finance_fy_filter = st.selectbox(
-                "FY of Savings-Finance",
+                "Finance FY",
                 options=finance_fy_options,
                 index=0
             )
@@ -189,7 +214,7 @@ if df is not None:
         if "FY of Savings-SCP" in df.columns:
             scp_fy_options = ["All"] + sorted(df["FY of Savings-SCP"].dropna().unique().tolist())
             scp_fy_filter = st.selectbox(
-                "FY of Savings-SCP",
+                "SCP FY",
                 options=scp_fy_options,
                 index=0
             )
@@ -198,14 +223,14 @@ if df is not None:
 
     # Domain filter (full width)
     if "Domain" in df.columns:
-        domain_options = ["All"] + sorted(df["Domain"].dropna().unique().tolist())
+        domain_options = ["All Domains"] + sorted(df["Domain"].dropna().unique().tolist())
         domain_filter = st.selectbox(
-            "🏢 Domain Filter",
+            "🏢 Business Domain",
             options=domain_options,
             index=0
         )
     else:
-        domain_filter = "All"
+        domain_filter = "All Domains"
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -227,81 +252,81 @@ if df is not None:
         filtered_df = filtered_df[filtered_df["FY of Savings-SCP"] == scp_fy_filter]
     
     # Domain filter
-    if domain_filter != "All":
+    if domain_filter != "All Domains":
         filtered_df = filtered_df[filtered_df["Domain"] == domain_filter]
 
     # Calculate insights from filtered data
     total_finance_savings = filtered_df["Savings_Finance"].sum()
-    positive_finance = filtered_df.loc[filtered_df["Savings_Finance"] > 0, "Savings_Finance"].sum()
-    negative_finance = filtered_df.loc[filtered_df["Savings_Finance"] < 0, "Savings_Finance"].sum()
+    gains_finance = filtered_df.loc[filtered_df["Savings_Finance"] > 0, "Savings_Finance"].sum()
+    risks_finance = filtered_df.loc[filtered_df["Savings_Finance"] < 0, "Savings_Finance"].sum()
     
     total_scp_savings = filtered_df["Savings_SCP"].sum()
-    positive_scp = filtered_df.loc[filtered_df["Savings_SCP"] > 0, "Savings_SCP"].sum()
-    negative_scp = filtered_df.loc[filtered_df["Savings_SCP"] < 0, "Savings_SCP"].sum()
+    gains_scp = filtered_df.loc[filtered_df["Savings_SCP"] > 0, "Savings_SCP"].sum()
+    risks_scp = filtered_df.loc[filtered_df["Savings_SCP"] < 0, "Savings_SCP"].sum()
 
-    # INSIGHTS PANEL - McKinsey Style
-    st.markdown("### 📊 Executive Summary")
+    # EXECUTIVE SUMMARY PANEL
+    st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
     
     insights_col1, insights_col2, insights_col3, insights_col4, insights_col5, insights_col6 = st.columns(6)
     
     with insights_col1:
         st.markdown(f"""
         <div class="insight-box">
-            <div class="insight-title">Total Finance Savings</div>
+            <div class="insight-title">Net Finance Impact</div>
             <div class="insight-value">${total_finance_savings:,.0f}</div>
-            <div class="insight-subtitle">Filtered Results</div>
+            <div class="insight-subtitle">Total Portfolio</div>
         </div>
         """, unsafe_allow_html=True)
 
     with insights_col2:
         st.markdown(f"""
-        <div class="insight-box insight-positive">
-            <div class="insight-title">Positive Finance</div>
-            <div class="insight-value">${positive_finance:,.0f}</div>
-            <div class="insight-subtitle">Gains</div>
+        <div class="insight-box insight-gains">
+            <div class="insight-title">Finance Upside</div>
+            <div class="insight-value">${gains_finance:,.0f}</div>
+            <div class="insight-subtitle">Value Creation</div>
         </div>
         """, unsafe_allow_html=True)
 
     with insights_col3:
         st.markdown(f"""
-        <div class="insight-box insight-negative">
-            <div class="insight-title">Negative Finance</div>
-            <div class="insight-value">${negative_finance:,.0f}</div>
-            <div class="insight-subtitle">Losses</div>
+        <div class="insight-box insight-risks">
+            <div class="insight-title">Finance Exposure</div>
+            <div class="insight-value">${abs(risks_finance):,.0f}</div>
+            <div class="insight-subtitle">Risk Management</div>
         </div>
         """, unsafe_allow_html=True)
 
     with insights_col4:
         st.markdown(f"""
         <div class="insight-box">
-            <div class="insight-title">Total SCP Savings</div>
+            <div class="insight-title">Net SCP Impact</div>
             <div class="insight-value">${total_scp_savings:,.0f}</div>
-            <div class="insight-subtitle">Filtered Results</div>
+            <div class="insight-subtitle">Total Portfolio</div>
         </div>
         """, unsafe_allow_html=True)
 
     with insights_col5:
         st.markdown(f"""
-        <div class="insight-box insight-positive">
-            <div class="insight-title">Positive SCP</div>
-            <div class="insight-value">${positive_scp:,.0f}</div>
-            <div class="insight-subtitle">Gains</div>
+        <div class="insight-box insight-gains">
+            <div class="insight-title">SCP Upside</div>
+            <div class="insight-value">${gains_scp:,.0f}</div>
+            <div class="insight-subtitle">Value Creation</div>
         </div>
         """, unsafe_allow_html=True)
 
     with insights_col6:
         st.markdown(f"""
-        <div class="insight-box insight-negative">
-            <div class="insight-title">Negative SCP</div>
-            <div class="insight-value">${negative_scp:,.0f}</div>
-            <div class="insight-subtitle">Losses</div>
+        <div class="insight-box insight-risks">
+            <div class="insight-title">SCP Exposure</div>
+            <div class="insight-value">${abs(risks_scp):,.0f}</div>
+            <div class="insight-subtitle">Risk Management</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # CHARTS SECTION
-    st.markdown("### 📈 Financial Analysis")
+    # STRATEGIC ANALYTICS SECTION
+    st.markdown('<h2 class="section-header">📊 Strategic Analytics</h2>', unsafe_allow_html=True)
 
     # McKinsey blue gradient colors
     mckinsey_blues = ['#001f3f', '#003366', '#004080', '#0066cc', '#3399ff', '#66b3ff', '#99ccff']
@@ -311,12 +336,12 @@ if df is not None:
     with chart_col1:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         
-        # Gradient Vertical Bar Chart for Finance Savings by FY
+        # Finance Savings by FY
         if "FY of Savings-Finance" in filtered_df.columns:
             finance_fy_data = filtered_df.groupby("FY of Savings-Finance")["Savings_Finance"].sum().reset_index()
             finance_fy_data = finance_fy_data.sort_values("FY of Savings-Finance")
             
-            # Create gradient colors based on data points
+            # Create gradient colors
             n_bars = len(finance_fy_data)
             colors = [mckinsey_blues[i % len(mckinsey_blues)] for i in range(n_bars)]
             
@@ -331,23 +356,23 @@ if df is not None:
                     text=f"${row['Savings_Finance']:,.0f}",
                     textposition="outside",
                     showlegend=False,
-                    hovertemplate=f"<b>FY:</b> {row['FY of Savings-Finance']}<br><b>Savings:</b> ${row['Savings_Finance']:,.0f}<extra></extra>"
+                    hovertemplate=f"<b>FY:</b> {row['FY of Savings-Finance']}<br><b>Impact:</b> ${row['Savings_Finance']:,.0f}<extra></extra>"
                 ))
             
             fig_finance.update_layout(
                 title={
-                    'text': "Finance Savings by Fiscal Year",
+                    'text': "Finance Impact by Fiscal Year",
                     'x': 0.5,
-                    'font': {'size': 20, 'color': '#003366', 'family': 'Helvetica Neue'}
+                    'font': {'size': 18, 'color': '#003366', 'family': 'Helvetica Neue'}
                 },
                 xaxis_title="Fiscal Year",
-                yaxis_title="Savings ($)",
+                yaxis_title="Financial Impact ($)",
                 plot_bgcolor="white",
                 paper_bgcolor="white",
-                font=dict(size=12, color="#003366"),
-                height=500,
-                xaxis=dict(showgrid=False),
-                yaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5)
+                font=dict(size=11, color="#003366"),
+                height=450,
+                xaxis=dict(showgrid=False, tickangle=0),
+                yaxis=dict(showgrid=True, gridcolor='#f0f0f0', gridwidth=1)
             )
             
             st.plotly_chart(fig_finance, use_container_width=True)
@@ -357,7 +382,7 @@ if df is not None:
     with chart_col2:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         
-        # Gradient Vertical Bar Chart for SCP Savings by FY
+        # SCP Savings by FY
         if "FY of Savings-SCP" in filtered_df.columns:
             scp_fy_data = filtered_df.groupby("FY of Savings-SCP")["Savings_SCP"].sum().reset_index()
             scp_fy_data = scp_fy_data.sort_values("FY of Savings-SCP")
@@ -377,32 +402,32 @@ if df is not None:
                     text=f"${row['Savings_SCP']:,.0f}",
                     textposition="outside",
                     showlegend=False,
-                    hovertemplate=f"<b>FY:</b> {row['FY of Savings-SCP']}<br><b>Savings:</b> ${row['Savings_SCP']:,.0f}<extra></extra>"
+                    hovertemplate=f"<b>FY:</b> {row['FY of Savings-SCP']}<br><b>Impact:</b> ${row['Savings_SCP']:,.0f}<extra></extra>"
                 ))
             
             fig_scp.update_layout(
                 title={
-                    'text': "SCP Savings by Fiscal Year",
+                    'text': "SCP Impact by Fiscal Year",
                     'x': 0.5,
-                    'font': {'size': 20, 'color': '#003366', 'family': 'Helvetica Neue'}
+                    'font': {'size': 18, 'color': '#003366', 'family': 'Helvetica Neue'}
                 },
                 xaxis_title="Fiscal Year",
-                yaxis_title="Savings ($)",
+                yaxis_title="SCP Impact ($)",
                 plot_bgcolor="white",
                 paper_bgcolor="white",
-                font=dict(size=12, color="#003366"),
-                height=500,
-                xaxis=dict(showgrid=False),
-                yaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5)
+                font=dict(size=11, color="#003366"),
+                height=450,
+                xaxis=dict(showgrid=False, tickangle=0),
+                yaxis=dict(showgrid=True, gridcolor='#f0f0f0', gridwidth=1)
             )
             
             st.plotly_chart(fig_scp, use_container_width=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # HORIZONTAL BAR CHART FOR DOMAINS
+    # DOMAIN ANALYSIS
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.markdown("### 🏢 Savings by Domain")
+    st.markdown('<h3 class="section-header">🏢 Business Domain Analysis</h3>', unsafe_allow_html=True)
     
     if "Domain" in filtered_df.columns:
         domain_finance = filtered_df.groupby("Domain")["Savings_Finance"].sum().reset_index()
@@ -424,23 +449,23 @@ if df is not None:
             ),
             text=[f"${val:,.0f}" for val in domain_finance["Savings_Finance"]],
             textposition="outside",
-            hovertemplate="<b>Domain:</b> %{y}<br><b>Savings:</b> $%{x:,.0f}<extra></extra>"
+            hovertemplate="<b>Domain:</b> %{y}<br><b>Financial Impact:</b> $%{x:,.0f}<extra></extra>"
         ))
         
         fig_domain.update_layout(
             title={
-                'text': "Finance Savings by Domain (Filtered)",
+                'text': "Financial Impact by Business Domain",
                 'x': 0.5,
-                'font': {'size': 20, 'color': '#003366', 'family': 'Helvetica Neue'}
+                'font': {'size': 18, 'color': '#003366', 'family': 'Helvetica Neue'}
             },
-            xaxis_title="Savings ($)",
-            yaxis_title="Domain",
+            xaxis_title="Financial Impact ($)",
+            yaxis_title="Business Domain",
             plot_bgcolor="white",
             paper_bgcolor="white",
-            font=dict(size=12, color="#003366"),
-            height=max(400, n_domains * 40),
+            font=dict(size=11, color="#003366"),
+            height=max(400, n_domains * 45),
             showlegend=False,
-            xaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5),
+            xaxis=dict(showgrid=True, gridcolor='#f0f0f0', gridwidth=1),
             yaxis=dict(showgrid=False)
         )
         
@@ -448,67 +473,71 @@ if df is not None:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # DATA TABLE SECTION
-    st.markdown("### 📋 Filtered Data Table")
+    # PORTFOLIO OVERVIEW
+    st.markdown('<h2 class="section-header">📋 Portfolio Overview</h2>', unsafe_allow_html=True)
     
-    # Show filter summary
-    filter_summary = f"Showing {len(filtered_df)} records"
-    if len(filtered_df) != len(df):
-        filter_summary += f" (filtered from {len(df)} total)"
-    st.info(filter_summary)
+    # Portfolio summary metrics
+    portfolio_col1, portfolio_col2, portfolio_col3, portfolio_col4 = st.columns(4)
     
-    # Display columns selection
-    display_columns = st.multiselect(
-        "Select columns to display:",
-        options=list(filtered_df.columns),
-        default=["Domain", "Forecast ID", "Brand Vendor Term Description", "Contract Start", "Contract End", 
-                "FY of Savings-Finance", "FY of Savings-SCP", "Savings_Finance", "Savings_SCP"],
-        help="Choose which columns to show in the table below"
-    )
+    with portfolio_col1:
+        st.metric("Active Contracts", len(filtered_df))
     
-    if display_columns:
-        # Format display data
-        display_df = filtered_df[display_columns].copy()
-        
-        # Format savings columns
-        savings_cols = ["Savings_Finance", "Savings_SCP"]
-        for col in savings_cols:
-            if col in display_df.columns:
-                display_df[col] = display_df[col].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "")
-        
-        # Format date columns
-        date_cols = ["Contract Start", "Contract End"]
-        for col in date_cols:
-            if col in display_df.columns:
-                display_df[col] = display_df[col].dt.strftime('%Y-%m-%d')
-        
-        st.dataframe(display_df, use_container_width=True, height=400)
-        
-        # Download buttons
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            csv_data = filtered_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Filtered Data (CSV)",
-                data=csv_data,
-                file_name=f"scp_savings_filtered_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            csv_display = display_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Display Data (CSV)",
-                data=csv_display,
-                file_name=f"scp_savings_display_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
+    with portfolio_col2:
+        avg_finance = filtered_df["Savings_Finance"].mean()
+        st.metric("Avg Finance Impact", f"${avg_finance:,.0f}")
+    
+    with portfolio_col3:
+        avg_scp = filtered_df["Savings_SCP"].mean()
+        st.metric("Avg SCP Impact", f"${avg_scp:,.0f}")
+    
+    with portfolio_col4:
+        if "Domain" in filtered_df.columns:
+            unique_domains = filtered_df["Domain"].nunique()
+            st.metric("Business Domains", unique_domains)
+
+    # Data export section
+    st.markdown("### 💾 Data Export")
+    
+    # Summary for executives
+    total_records = len(filtered_df)
+    if total_records != len(df):
+        st.markdown(f'<div class="data-summary">Portfolio Analysis: {total_records:,} contracts selected from {len(df):,} total records</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="data-summary">Complete Portfolio Analysis: {total_records:,} active contracts</div>', unsafe_allow_html=True)
+
+    # Download options
+    export_col1, export_col2 = st.columns(2)
+    
+    with export_col1:
+        # Executive summary export
+        summary_data = {
+            'Metric': ['Net Finance Impact', 'Finance Upside', 'Finance Exposure', 'Net SCP Impact', 'SCP Upside', 'SCP Exposure'],
+            'Value': [total_finance_savings, gains_finance, abs(risks_finance), total_scp_savings, gains_scp, abs(risks_scp)]
+        }
+        summary_df = pd.DataFrame(summary_data)
+        csv_summary = summary_df.to_csv(index=False)
+        st.download_button(
+            label="📊 Download Executive Summary",
+            data=csv_summary,
+            file_name=f"executive_summary_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv"
+        )
+    
+    with export_col2:
+        # Full portfolio export
+        csv_data = filtered_df.to_csv(index=False)
+        st.download_button(
+            label="📁 Download Portfolio Data",
+            data=csv_data,
+            file_name=f"portfolio_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv"
+        )
 
 else:
-    st.error("⚠️ No data available!")
-    st.info("Please upload an Excel file or ensure the data file is in the correct location.")
+    # Error state
+    st.error("⚠️ Data source unavailable")
+    st.info("Please upload an Excel file using the sidebar to proceed with the analysis.")
 
 # Footer
 st.markdown("---")
-st.markdown("**SCP Savings Dashboard** | Built with Streamlit | McKinsey-style Analytics")
+st.markdown("**Executive SCP Savings Dashboard** | Strategic Portfolio Analytics | Confidential")
