@@ -1,4 +1,4 @@
-# app.py - Executive SCP Savings Dashboard
+# app.py - Executive SCP Savings Dashboard with OneDrive Integration
 
 import streamlit as st
 import pandas as pd
@@ -6,6 +6,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, date
 import numpy as np
+import requests
+from io import BytesIO
 
 # Configure Streamlit page
 st.set_page_config(
@@ -15,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Executive-style CSS
+# Executive-style CSS with font sizes reduced by 1.5 points
 st.markdown("""
 <style>
     .main-header {
@@ -54,7 +56,7 @@ st.markdown("""
         background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
     }
     .insight-title {
-        font-size: 14px;
+        font-size: 12.5px;
         font-weight: 500;
         margin-bottom: 8px;
         opacity: 0.95;
@@ -62,13 +64,13 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
     .insight-value {
-        font-size: 28px;
+        font-size: 26.5px;
         font-weight: 700;
         margin-bottom: 8px;
         line-height: 1;
     }
     .insight-subtitle {
-        font-size: 11px;
+        font-size: 9.5px;
         opacity: 0.85;
         font-style: italic;
     }
@@ -104,40 +106,111 @@ st.markdown("""
         text-align: center;
         font-weight: 500;
     }
+    .onedrive-config {
+        background: linear-gradient(135deg, #e6f3ff 0%, #ccebff 100%);
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 4px solid #003366;
+        margin-bottom: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Load data function
-@st.cache_data
-def load_data():
+# OneDrive file configuration
+def convert_onedrive_url(share_url):
+    """Convert OneDrive sharing URL to direct download URL"""
     try:
-        file_path = "SCP_Savings_FY26_dummy_v3.xlsx"
-        df = pd.read_excel(file_path, sheet_name="Savings_WIP_Data")
-        return df
-    except FileNotFoundError:
-        st.error("❌ Excel file 'SCP_Savings_FY26_dummy_v3.xlsx' not found.")
-        return None
+        # For OneDrive URLs, attempt to convert to direct download
+        if "onedrive.live.com" in share_url:
+            # Extract file ID and convert to direct download
+            if "resid=" in share_url:
+                # Try to construct direct download URL
+                base_url = share_url.split("?")[0]
+                direct_url = base_url + "?download=1"
+                return direct_url
+        elif "1drv.ms" in share_url:
+            # Handle shortened OneDrive URLs
+            return share_url + "&download=1" if "?" in share_url else share_url + "?download=1"
+        
+        return share_url
+    except:
+        return share_url
+
+# Load data from OneDrive
+@st.cache_data
+def load_data_from_onedrive(onedrive_url):
+    try:
+        # Convert sharing URL to direct download
+        direct_url = convert_onedrive_url(onedrive_url)
+        
+        # Try loading directly first
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(direct_url, headers=headers, timeout=30, allow_redirects=True)
+            
+            if response.status_code == 200:
+                df = pd.read_excel(BytesIO(response.content), sheet_name="Savings_WIP_Data")
+                return df, "OneDrive file loaded successfully"
+        except Exception as e:
+            # Try alternative approach
+            try:
+                response = requests.get(onedrive_url, headers=headers, timeout=30)
+                if response.status_code == 200:
+                    df = pd.read_excel(BytesIO(response.content), sheet_name="Savings_WIP_Data")
+                    return df, "OneDrive file loaded successfully (alternative method)"
+            except:
+                pass
+        
+        # Fallback to local file for demonstration
+        try:
+            df = pd.read_excel("SCP_Savings_FY26_dummy_v3.xlsx", sheet_name="Savings_WIP_Data")
+            return df, "Using local file (OneDrive connection issue - please check URL)"
+        except:
+            return None, "Unable to load data from OneDrive or local file"
+            
     except Exception as e:
-        st.error(f"❌ Error loading data: {str(e)}")
-        return None
+        return None, f"Error loading data: {str(e)}"
 
-# File upload option
+# Dashboard Header
+st.markdown('<h1 class="main-header">Executive SCP Savings Dashboard</h1>', unsafe_allow_html=True)
+
+# OneDrive Configuration Section
 with st.sidebar:
-    st.header("📁 Data Upload")
-    uploaded_file = st.file_uploader(
-        "Upload Excel File", 
-        type=['xlsx', 'xls'],
-        help="Upload your SCP Savings file"
+    st.markdown('<div class="onedrive-config">', unsafe_allow_html=True)
+    st.header("🔗 OneDrive Configuration")
+    
+    # *** THIS IS THE LINE TO UPDATE YOUR ONEDRIVE URL ***
+    default_url = "https://onedrive.live.com/:x:/g/personal/9E1C07238F947303/EbI62L-aBvdDgxmyFIMOdugB5BoH7r7ATZcU1ywNSR1Psw?resid=9E1C07238F947303!sbfd83ab2069a43f78319b214830e76e8&ithint=file%2Cxlsx&e=bSpS5T&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy85ZTFjMDcyMzhmOTQ3MzAzL0ViSTYyTC1hQnZkRGd4bXlGSU1PZHVnQjVCb0g3cjdBVFpjVTF5d05TUjFQc3c_ZT1iU3BTNVQ"
+    
+    onedrive_url = st.text_input(
+        "OneDrive File URL:",
+        value=default_url,
+        help="Paste your OneDrive Excel file sharing URL here"
     )
+    
+    if st.button("🔄 Reload Data"):
+        st.cache_data.clear()
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Data source info
+    st.info("📊 Data Source: OneDrive Integration")
+    st.markdown("---")
+    st.markdown("**Dashboard Features:**")
+    st.markdown("• Executive Summary")
+    st.markdown("• Strategic Analytics")
+    st.markdown("• Domain Analysis")
+    st.markdown("• Portfolio Overview")
 
-# Load data
-if uploaded_file:
-    df = pd.read_excel(uploaded_file, sheet_name="Savings_WIP_Data")
-    st.sidebar.success("✅ File uploaded successfully!")
-else:
-    df = load_data()
+# Load data from OneDrive
+df, load_message = load_data_from_onedrive(onedrive_url)
 
 if df is not None:
+    st.success(f"✅ {load_message}")
+    
     # Data preprocessing
     df.rename(columns={
         "Difference (PA)-Finance": "Savings_Finance",
@@ -153,9 +226,6 @@ if df is not None:
     for col in date_columns:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
-
-    # Dashboard Header
-    st.markdown('<h1 class="main-header">Executive SCP Savings Dashboard</h1>', unsafe_allow_html=True)
 
     # FILTERS SECTION
     st.markdown('<div class="filter-section">', unsafe_allow_html=True)
@@ -535,9 +605,19 @@ if df is not None:
 
 else:
     # Error state
-    st.error("⚠️ Data source unavailable")
-    st.info("Please upload an Excel file using the sidebar to proceed with the analysis.")
+    st.error(f"⚠️ {load_message}")
+    st.info("Please check your OneDrive URL and ensure the file is accessible.")
+    
+    # Show example URL format
+    st.markdown("### 📝 OneDrive URL Format")
+    st.code("https://onedrive.live.com/:x:/g/personal/[user-id]/[file-params]")
+    
+    st.markdown("### 🔧 Troubleshooting")
+    st.markdown("• Ensure the OneDrive file has appropriate sharing permissions")
+    st.markdown("• Verify the Excel file contains 'Savings_WIP_Data' sheet")
+    st.markdown("• Check if the file URL is accessible from external applications")
+    st.markdown("• Contact IT support if OneDrive API integration is required")
 
 # Footer
 st.markdown("---")
-st.markdown("**Executive SCP Savings Dashboard** | Strategic Portfolio Analytics | Confidential")
+st.markdown("**Executive SCP Savings Dashboard** | OneDrive Integration | Strategic Portfolio Analytics | Confidential")
